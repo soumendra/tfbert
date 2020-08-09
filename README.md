@@ -20,3 +20,6 @@ poetry run python main.py
 
 Currently stuck at `current_error.png`
 
+# Later
+
+https://www.kaggle.com/aditya08/tf2-2-k-fold-bert-fine-tuning
