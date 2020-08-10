@@ -146,14 +146,27 @@ class ColaData:
             losses.append(loss)
             preds.append(np.argmax(logits, axis=1).flatten())
         return outputs, losses, preds, actuals
+    
+    def predict(self, test_dataset):
+        preds = []
+
+        @tf.function
+        def pred_step(model, inputs):
+            logits = model(inputs, training=False)
+            return logits
+
+        for idx, batch in tqdm(enumerate(test_dataset)):
+            logits = pred_step(self.model, [batch[0], batch[1]])
+            preds.append(np.argmax(logits, axis=1).flatten())
+        return preds
 
     def create_submission(self):
         # To be done
         self.test_dataset = BertDataset.create(
             self.testdf["Sentence"].values, [[0, 1]] * len(df_test), EVAL_BATCH_SIZE  # creating fake labels
         )
-        outputs, losses, preds, actuals = eval_fun(test_dataset, model)
+        preds = self.predict(test_dataset)
         preds = [item for sublist in preds for item in sublist]
         df_test["Label"] = preds
-        df_test["Label"].value_counts()
+        print(f"\n\nTest Data: \ndf_test['Label'].value_counts()")
         df_test[["Id", "Label"]].to_csv("sample_submission.csv", index=False)
