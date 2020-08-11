@@ -163,10 +163,11 @@ class ColaData:
     def create_submission(self):
         # To be done
         self.test_dataset = BertDataset.create(
-            self.testdf["Sentence"].values, [[0, 1]] * len(df_test), EVAL_BATCH_SIZE  # creating fake labels
+            self.testdf["Sentence"].values, [[0, 1]] * len(self.testdf), config.eval_batch_size  # creating fake labels
         )
-        preds = self.predict(test_dataset)
+        preds = self.predict(self.test_dataset)
         preds = [item for sublist in preds for item in sublist]
-        df_test["Label"] = preds
-        print(f"\n\nTest Data: \ndf_test['Label'].value_counts()")
-        df_test[["Id", "Label"]].to_csv("sample_submission.csv", index=False)
+        self.testdf["Label"] = preds
+        print(f"\n\nTest Data: \nself.testdf['Label'].value_counts()")
+        self.testdf[["Id", "Label"]].to_csv("sample_submission.csv", index=False)
+
