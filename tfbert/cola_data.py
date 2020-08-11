@@ -161,13 +161,13 @@ class ColaData:
         return preds
 
     def create_submission(self):
-        # To be done
         self.test_dataset = BertDataset.create(
-            self.testdf["Sentence"].values, [[0, 1]] * len(self.testdf), config.eval_batch_size  # creating fake labels
+            self.testdf["Sentence"].values, [[0, 1]] * len(self.testdf), # creating fake labels 
+            self.config.max_len, self.config.eval_batch_size  
         )
         preds = self.predict(self.test_dataset)
         preds = [item for sublist in preds for item in sublist]
         self.testdf["Label"] = preds
-        print(f"\n\nTest Data: \nself.testdf['Label'].value_counts()")
+        print(f"\n\nTest Data: \n{self.testdf['Label'].value_counts()}")
         self.testdf[["Id", "Label"]].to_csv("sample_submission.csv", index=False)
 
