@@ -6,3 +6,4 @@ from transformers import AdamWeightDecay, WarmUp
 
 exp = ColaData(configs_local.datapath)
 exp.train(configs_local, BertModel(), bce, AdamWeightDecay(learning_rate=configs_local.lr))
+exp.create_submission()
