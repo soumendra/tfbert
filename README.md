@@ -1,3 +1,10 @@
+# General
+
+* Managing Python version: `asdf`
+* Python dependancy/project management: `poetry`
+* Data/model versioning/management: `dvc`
+* Auto-linting: `black`
+
 # tfbert
 Go away
 
