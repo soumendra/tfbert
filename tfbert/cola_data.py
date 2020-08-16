@@ -17,14 +17,12 @@ class BertDataset:
     def __init__(self, max_len, model_name, batch_size):
         self.max_len = max_len
         self.model_name = model_name
-        self.tokenzier = AutoTokenizer(self.model_name)
+        self.tokenzier = AutoTokenizer.from_pretrained(self.model_name)
         self.batch_size = batch_size
 
     def encode_text(self, sentences):
         sentences = [" ".join(sentence.split()) for sentence in sentences]
-        encoded = self.tokenizer.batch_encode_plus(
-            sentences, max_length=self.max_len, pad_to_max_length=True
-        )
+        encoded = self.tokenizer.batch_encode_plus(sentences, max_length=self.max_len, pad_to_max_length=True)
         input_ids = encoded["input_ids"]
         attention_mask = encoded["attention_mask"]
         return (input_ids, attention_mask)
@@ -43,24 +41,16 @@ class BertDataset:
 class ColaData:
     @staticmethod
     def describe_df(df: DataFrame, label: str) -> None:
-        print(
-            f"{label}\nShape: {df.shape}\nDistribution:\n{df['label'].value_counts()}\n"
-        )
+        print(f"{label}\nShape: {df.shape}\nDistribution:\n{df['label'].value_counts()}\n")
 
     @staticmethod
     def get_cola_xy(df: DataFrame) -> List[DataFrame]:
         return [df["sentence"], df["label"]]
 
     def get_cola_df(self):
-        in_domain_train = pd.read_csv(
-            self.path / "in_domain_train.tsv", sep="\t", names=self.cols
-        )
-        in_domain_val = pd.read_csv(
-            self.path / "in_domain_dev.tsv", sep="\t", names=self.cols
-        )
-        out_domain_val = pd.read_csv(
-            self.path / "out_of_domain_dev.tsv", sep="\t", names=self.cols
-        )
+        in_domain_train = pd.read_csv(self.path / "in_domain_train.tsv", sep="\t", names=self.cols)
+        in_domain_val = pd.read_csv(self.path / "in_domain_dev.tsv", sep="\t", names=self.cols)
+        out_domain_val = pd.read_csv(self.path / "out_of_domain_dev.tsv", sep="\t", names=self.cols)
         val = in_domain_val.append(out_domain_val)
         test = pd.read_csv(self.path / "../../../cola_out_of_domain_test.tsv", sep="\t")
         return [in_domain_train, val, test]
@@ -104,16 +94,10 @@ class ColaData:
         self.loss_fn = loss_fn
         self.optimizer = optimizer
 
-        self.train_bert_dataset = BertDataset(
-            config.max_len, config.model_name, config.train_batch_size
-        )
-        self.train_dataset = self.train_bert_dataset.create(
-            self.x_train, self.y_train_enc
-        )
+        self.train_bert_dataset = BertDataset(config.max_len, config.model_name, config.train_batch_size)
+        self.train_dataset = self.train_bert_dataset.create(self.x_train, self.y_train_enc)
 
-        self.val_bert_dataset = BertDataset(
-            config.max_len, config.model_name, config.eval_batch_size
-        )
+        self.val_bert_dataset = BertDataset(config.max_len, config.model_name, config.eval_batch_size)
         self.val_dataset = self.val_bert_dataset.create(self.x_val, self.y_val_enc)
 
         epochs = config.epochs
@@ -124,12 +108,8 @@ class ColaData:
             outputs, losses, preds, actuals = self.eval()
             actuals = [item.numpy() for sublist in actuals for item in sublist]
             preds = [item for sublist in preds for item in sublist]
-            print(
-                f"Validation Accuracy: {accuracy_score(np.argmax(actuals, axis=1).flatten(), preds)}"
-            )
-            print(
-                f"Validation MCC: {matthews_corrcoef(np.argmax(actuals, axis=1).flatten(), preds)}"
-            )
+            print(f"Validation Accuracy: {accuracy_score(np.argmax(actuals, axis=1).flatten(), preds)}")
+            print(f"Validation MCC: {matthews_corrcoef(np.argmax(actuals, axis=1).flatten(), preds)}")
             print(f"Validation Loss: {np.mean(losses)}\n")
         return self
 
