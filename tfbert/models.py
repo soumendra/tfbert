@@ -1,6 +1,7 @@
 import tensorflow as tf  # type: ignore
 from tensorflow.keras.layers import Dropout, Dense  # type: ignore
 from transformers import TFAutoModel  # type: ignore
+
 tf.get_logger().setLevel("INFO")
 
 
@@ -29,4 +30,3 @@ class BaseModel(tf.keras.Model):
         output_values = self.dropout(cls_embeddings, training=training)
         logits = self.dense(output_values)
         return logits
-
