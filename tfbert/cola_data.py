@@ -17,7 +17,7 @@ class BertDataset:
     def __init__(self, max_len, model_name, batch_size):
         self.max_len = max_len
         self.model_name = model_name
-        self.tokenzier = AutoTokenizer.from_pretrained(self.model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.batch_size = batch_size
 
     def encode_text(self, sentences):
@@ -28,9 +28,10 @@ class BertDataset:
         return (input_ids, attention_mask)
 
     def create(self, sentences, labels, training=False):
-        input_ids, attention_mask = self.encode_text(sentences, labels)
-        dataset = tf.data.Dataset.from_tensor_slices(sentences, labels)
+        input_ids, attention_mask = self.encode_text(sentences)
+        dataset = tf.data.Dataset.from_tensor_slices((input_ids, labels))
         if training:
+            dataset = dataset.repeat()
             dataset = dataset.shuffle(tf.data.experimental.AUTOTUNE)
         dataset = dataset.cache()
         dataset = dataset.batch(self.batch_size)
@@ -45,7 +46,7 @@ class ColaData:
 
     @staticmethod
     def get_cola_xy(df: DataFrame) -> List[DataFrame]:
-        return [df["sentence"], df["label"]]
+        return [df["sentence"].head(100), df["label"].head(100)]
 
     def get_cola_df(self):
         in_domain_train = pd.read_csv(self.path / "in_domain_train.tsv", sep="\t", names=self.cols)
@@ -81,8 +82,8 @@ class ColaData:
             return loss, logits
 
         losses: List = []
-        for idx, batch in tqdm(enumerate(self.train_dataset)):
-            loss, logits = train_step(model, [batch[0], batch[1]], batch[2], optimizer)
+        for idx, (input_ids, label) in tqdm(enumerate(self.train_dataset)):
+            loss, logits = train_step(model, input_ids, label, optimizer)
             if idx % 50 == 0 and idx != 0:
                 print(f"Batch: {idx}\tLoss: {np.mean(losses)}")
             losses.append(loss)
@@ -125,8 +126,8 @@ class ColaData:
             loss = self.loss_fn(y, logits)
             return logits, loss, y
 
-        for idx, batch in tqdm(enumerate(self.val_dataset)):
-            logits, loss, y = eval_step(self.model, [batch[0], batch[1]], batch[2])
+        for idx, (input_ids, label) in tqdm(enumerate(self.val_dataset)):
+            logits, loss, y = eval_step(self.model, input_ids, label)
             outputs.append(logits)
             actuals.append(y)
             losses.append(loss)
