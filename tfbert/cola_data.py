@@ -46,7 +46,7 @@ class ColaData:
 
     @staticmethod
     def get_cola_xy(df: DataFrame) -> List[DataFrame]:
-        return [df["sentence"].head(100), df["label"].head(100)]
+        return [df["sentence"], df["label"]]
 
     def get_cola_df(self):
         in_domain_train = pd.read_csv(self.path / "in_domain_train.tsv", sep="\t", names=self.cols)
@@ -148,12 +148,8 @@ class ColaData:
         return preds
 
     def create_submission(self):
-        self.test_dataset = BertDataset.create(
-            self.testdf["Sentence"].values,
-            [[0, 1]] * len(self.testdf),  # creating fake labels
-            self.config.max_len,
-            self.config.eval_batch_size,
-        )
+        self.test_bert_dataset = BertDataset(self.config.max_len, self.config.model_name, self.config.eval_batch_size)
+        self.test_dataset = self.test_bert_dataset.create(self.testdf["sentence"], [0, 1] * len(self.testdf))
         preds = self.predict(self.test_dataset)
         preds = [item for sublist in preds for item in sublist]
         self.testdf["Label"] = preds
