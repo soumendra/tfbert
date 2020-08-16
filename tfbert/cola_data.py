@@ -9,7 +9,7 @@ from attrdict import AttrDict  # type: ignore
 from tqdm import tqdm  # type: ignore
 import numpy as np  # type: ignore
 from sklearn.metrics import accuracy_score, matthews_corrcoef  # type: ignore
-
+tf.get_logger().setLevel("INFO")
 
 tokenizer = BertTokenizerFast("data/bert-base-uncased-vocab.txt", lowercase=True)
 def preprocess(sentence, label, max_len):

@@ -1,6 +1,7 @@
 import tensorflow as tf  # type: ignore
 from tensorflow.keras.layers import Dropout, Dense  # type: ignore
 from transformers import TFBertModel  # type: ignore
+tf.get_logger().setLevel("INFO")
 
 
 class BertModel(tf.keras.Model):
