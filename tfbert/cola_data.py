@@ -3,48 +3,37 @@ from pathlib import Path
 from pandas import DataFrame
 from typing import List, Union
 from tensorflow.keras.utils import to_categorical  # type: ignore
-from transformers import BertTokenizerFast  # type: ignore
+from transformers import AutoTokenizer  # type: ignore
 import tensorflow as tf  # type: ignore
 from attrdict import AttrDict  # type: ignore
 from tqdm import tqdm  # type: ignore
 import numpy as np  # type: ignore
 from sklearn.metrics import accuracy_score, matthews_corrcoef  # type: ignore
+
 tf.get_logger().setLevel("INFO")
 
-tokenizer = BertTokenizerFast("data/bert-base-uncased-vocab.txt", lowercase=True)
-def preprocess(sentence, label, max_len):
-    sentence = str(sentence.decode("utf-8"))
-    sentence = " ".join(sentence.split())
-    encoded = tokenizer.encode_plus(
-        sentence,
-        add_special_tokens=True,
-        max_length=max_len,
-        pad_to_max_length=True,
-        return_attention_mask=True,
-        truncation=True,
-    )
-    input_ids = encoded["input_ids"]
-    attention_mask = encoded["attention_mask"]
-    return (input_ids, attention_mask, label)
 
-class BertDataset(tf.data.Dataset):
-    def _generator(sentences, labels, max_len):
-        for sent, lbl in zip(sentences, labels):
-            yield preprocess(sent, lbl, max_len)
+class BertDataset:
+    def __init__(self, max_len, model_name, batch_size):
+        self.max_len = max_len
+        self.model_name = model_name
+        self.tokenzier = AutoTokenizer(self.model_name)
+        self.batch_size = batch_size
 
-    def __new__(cls, sentences, labels, max_len):
-        return tf.data.Dataset.from_generator(
-            cls._generator,
-            args=(sentences, labels, max_len),
-            output_types=(tf.dtypes.int32, tf.dtypes.int32, tf.dtypes.float32),
-            output_shapes=((max_len,), (max_len,), (2,)),
-        )
+    def encode_text(self, sentences):
+        sentences = [" ".join(sentence.split()) for sentence in sentences]
+        encoded = self.tokenizer.batch_encode_plus(sentences, max_length=self.max_len, pad_to_max_length=True)
+        input_ids = encoded["input_ids"]
+        attention_mask = encoded["attention_mask"]
+        return (input_ids, attention_mask)
 
-    @staticmethod
-    def create(sentences, labels, max_len, batch_size):
-        dataset = BertDataset(sentences, labels, max_len)
+    def create(self, sentences, labels, training=False):
+        input_ids, attention_mask = self.encode_text(sentences, labels)
+        dataset = tf.data.Dataset.from_tensor_slices(sentences, labels)
+        if training:
+            dataset = dataset.shuffle(tf.data.experimental.AUTOTUNE)
         dataset = dataset.cache()
-        dataset = dataset.batch(batch_size)
+        dataset = dataset.batch(self.batch_size)
         dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
         return dataset
 
@@ -91,7 +80,7 @@ class ColaData:
             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
             return loss, logits
 
-        losses = []
+        losses: List = []
         for idx, batch in tqdm(enumerate(self.train_dataset)):
             loss, logits = train_step(model, [batch[0], batch[1]], batch[2], optimizer)
             if idx % 50 == 0 and idx != 0:
@@ -104,15 +93,12 @@ class ColaData:
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
-        self.tokenizer = BertTokenizerFast(str(self.path / "../../../bert-base-uncased-vocab.txt"), lowercase=True)
-        # https://github.com/huggingface/tokenizers/issues/168
 
-        self.train_dataset = BertDataset.create(
-            self.x_train, self.y_train_enc, config.max_len, config.train_batch_size
-        )
-        self.val_dataset = BertDataset.create(
-            self.x_val, self.y_val_enc, config.max_len, config.eval_batch_size
-        )
+        self.train_bert_dataset = BertDataset(config.max_len, config.model_name, config.train_batch_size)
+        self.train_dataset = self.train_bert_dataset.create(self.x_train, self.y_train_enc)
+
+        self.val_bert_dataset = BertDataset(config.max_len, config.model_name, config.eval_batch_size)
+        self.val_dataset = self.val_bert_dataset.create(self.x_val, self.y_val_enc)
 
         epochs = config.epochs
         for epoch in range(epochs):
@@ -146,7 +132,7 @@ class ColaData:
             losses.append(loss)
             preds.append(np.argmax(logits, axis=1).flatten())
         return outputs, losses, preds, actuals
-    
+
     def predict(self, test_dataset):
         preds = []
 
@@ -162,12 +148,13 @@ class ColaData:
 
     def create_submission(self):
         self.test_dataset = BertDataset.create(
-            self.testdf["Sentence"].values, [[0, 1]] * len(self.testdf), # creating fake labels 
-            self.config.max_len, self.config.eval_batch_size  
+            self.testdf["Sentence"].values,
+            [[0, 1]] * len(self.testdf),  # creating fake labels
+            self.config.max_len,
+            self.config.eval_batch_size,
         )
         preds = self.predict(self.test_dataset)
         preds = [item for sublist in preds for item in sublist]
         self.testdf["Label"] = preds
         print(f"\n\nTest Data: \n{self.testdf['Label'].value_counts()}")
         self.testdf[["Id", "Label"]].to_csv("sample_submission.csv", index=False)
-
