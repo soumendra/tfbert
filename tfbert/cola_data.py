@@ -3,6 +3,7 @@ from pathlib import Path
 from pandas import DataFrame
 from typing import List, Union
 from tensorflow.keras.utils import to_categorical  # type: ignore
+import tensorflow_addons as tfa  # type: ignore
 from transformers import AutoTokenizer  # type: ignore
 import tensorflow as tf  # type: ignore
 from attrdict import AttrDict  # type: ignore
@@ -22,13 +23,15 @@ class BertDataset:
 
     def encode_text(self, sentences):
         sentences = [" ".join(sentence.split()) for sentence in sentences]
-        encoded = self.tokenizer.batch_encode_plus(sentences, max_length=self.max_len, pad_to_max_length=True)
+        encoded = self.tokenizer.batch_encode_plus(
+            sentences, max_length=self.max_len, pad_to_max_length=True, truncation=True
+        )
         input_ids = encoded["input_ids"]
         attention_mask = encoded["attention_mask"]
         return (input_ids, attention_mask)
 
     def create(self, sentences, labels, training=False):
-        input_ids, attention_mask = self.encode_text(sentences)
+        input_ids, _ = self.encode_text(sentences)
         dataset = tf.data.Dataset.from_tensor_slices((input_ids, labels))
         if training:
             dataset = dataset.repeat()
@@ -46,7 +49,7 @@ class ColaData:
 
     @staticmethod
     def get_cola_xy(df: DataFrame) -> List[DataFrame]:
-        return [df["sentence"], df["label"]]
+        return [df["sentence"].head(100), df["label"].head(100)]
 
     def get_cola_df(self):
         in_domain_train = pd.read_csv(self.path / "in_domain_train.tsv", sep="\t", names=self.cols)
@@ -70,25 +73,6 @@ class ColaData:
         self.describe_df(self.traindf, "Train Data")
         self.describe_df(self.valdf, "Val Data")
 
-    def _train(self, config: AttrDict, model, loss_fn, optimizer):
-        @tf.function
-        def train_step(model, inputs, y, optimizer):
-            with tf.GradientTape() as tape:
-                logits = model(inputs, training=True)
-                loss = loss_fn(y, logits)
-
-            gradients = tape.gradient(loss, model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-            return loss, logits
-
-        losses: List = []
-        for idx, (input_ids, label) in tqdm(enumerate(self.train_dataset)):
-            loss, logits = train_step(model, input_ids, label, optimizer)
-            if idx % 50 == 0 and idx != 0:
-                print(f"Batch: {idx}\tLoss: {np.mean(losses)}")
-            losses.append(loss)
-        return self
-
     def train(self, config: AttrDict, model, loss_fn, optimizer):
         self.config = config
         self.model = model
@@ -101,57 +85,25 @@ class ColaData:
         self.val_bert_dataset = BertDataset(config.max_len, config.model_name, config.eval_batch_size)
         self.val_dataset = self.val_bert_dataset.create(self.x_val, self.y_val_enc)
 
-        epochs = config.epochs
-        for epoch in range(epochs):
-            print(f"\nEpoch: {epoch+1}/{epochs}")
-            self._train(self.config, self.model, self.loss_fn, self.optimizer)
+        self.model.compile(
+            optimizer=self.optimizer,
+            loss=self.loss_fn,
+            metrics=["accuracy", tfa.metrics.MatthewsCorrelationCoefficient(num_classes=2)],
+        )
 
-            outputs, losses, preds, actuals = self.eval()
-            actuals = [item.numpy() for sublist in actuals for item in sublist]
-            preds = [item for sublist in preds for item in sublist]
-            print(f"Validation Accuracy: {accuracy_score(np.argmax(actuals, axis=1).flatten(), preds)}")
-            print(f"Validation MCC: {matthews_corrcoef(np.argmax(actuals, axis=1).flatten(), preds)}")
-            print(f"Validation Loss: {np.mean(losses)}\n")
+        self.model.fit(
+            self.train_dataset,
+            epochs=config.epochs,
+            validation_data=self.val_dataset,
+            steps_per_epoch=len(self.x_train) // config.train_batch_size,
+        )
+
         return self
-
-    def eval(self):
-        outputs = []
-        preds = []
-        actuals = []
-        losses = []
-
-        @tf.function
-        def eval_step(model, inputs, y):
-            logits = model(inputs, training=False)
-            loss = self.loss_fn(y, logits)
-            return logits, loss, y
-
-        for idx, (input_ids, label) in tqdm(enumerate(self.val_dataset)):
-            logits, loss, y = eval_step(self.model, input_ids, label)
-            outputs.append(logits)
-            actuals.append(y)
-            losses.append(loss)
-            preds.append(np.argmax(logits, axis=1).flatten())
-        return outputs, losses, preds, actuals
-
-    def predict(self, test_dataset):
-        preds = []
-
-        @tf.function
-        def pred_step(model, inputs):
-            logits = model(inputs, training=False)
-            return logits
-
-        for idx, batch in tqdm(enumerate(test_dataset)):
-            logits = pred_step(self.model, [batch[0], batch[1]])
-            preds.append(np.argmax(logits, axis=1).flatten())
-        return preds
 
     def create_submission(self):
         self.test_bert_dataset = BertDataset(self.config.max_len, self.config.model_name, self.config.eval_batch_size)
         self.test_dataset = self.test_bert_dataset.create(self.testdf["sentence"], [0, 1] * len(self.testdf))
-        preds = self.predict(self.test_dataset)
-        preds = [item for sublist in preds for item in sublist]
+        preds = self.model.predict(self.test_dataset)
         self.testdf["Label"] = preds
         print(f"\n\nTest Data: \n{self.testdf['Label'].value_counts()}")
         self.testdf[["Id", "Label"]].to_csv("sample_submission.csv", index=False)
