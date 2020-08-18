@@ -1,8 +1,8 @@
-from config import configs_local
+from config import configs_local  # type: ignore
 from tfbert.cola_data import ColaData  # type: ignore
 from tfbert.models import BaseModel  # type: ignore
 from tfbert.loss import bce  # type: ignore
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam  # type: ignore
 
 exp = ColaData(configs_local.datapath)
 exp.train(

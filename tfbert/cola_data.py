@@ -1,5 +1,5 @@
 from .dataset import BertDataset
-import numpy as np
+import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 from pathlib import Path
 from pandas import DataFrame
