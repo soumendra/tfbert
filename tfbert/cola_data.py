@@ -1,11 +1,11 @@
 from .dataset import BertDataset
+from .metrics import matthews_correlation
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 from pathlib import Path
 from pandas import DataFrame
 from typing import List, Union
 from tensorflow.keras.utils import to_categorical  # type: ignore
-import tensorflow_addons as tfa  # type: ignore
 from attrdict import AttrDict  # type: ignore
 
 
@@ -53,9 +53,7 @@ class ColaData:
         valid_dataset = valid_data_obj.create(self.x_val.values, self.y_val_enc)
 
         self.model.compile(
-            optimizer=self.optimizer,
-            loss=self.loss_fn,
-            metrics=["accuracy", tfa.metrics.MatthewsCorrelationCoefficient(num_classes=2)],
+            optimizer=self.optimizer, loss=self.loss_fn, metrics=["accuracy", matthews_correlation],
         )
 
         self.model.fit(train_dataset, epochs=config.epochs, validation_data=valid_dataset)
