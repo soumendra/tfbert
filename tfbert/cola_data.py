@@ -16,14 +16,14 @@ class ColaData:
 
     @staticmethod
     def get_cola_xy(df: DataFrame) -> List[DataFrame]:
-        return [df["sentence"].head(50), df["label"].head(50)]
+        return [df["sentence"]), df["label"]]
 
     def get_cola_df(self):
         in_domain_train = pd.read_csv(self.path / "in_domain_train.tsv", sep="\t", names=self.cols)
         in_domain_val = pd.read_csv(self.path / "in_domain_dev.tsv", sep="\t", names=self.cols)
         out_domain_val = pd.read_csv(self.path / "out_of_domain_dev.tsv", sep="\t", names=self.cols)
         val = in_domain_val.append(out_domain_val)
-        test = pd.read_csv(self.path / "../../../cola_out_of_domain_test.tsv", sep="\t")[:10]
+        test = pd.read_csv(self.path / "../../../cola_out_of_domain_test.tsv", sep="\t")
         return [in_domain_train, val, test]
 
     def __init__(self, path: Union[str, Path]):
