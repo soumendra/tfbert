@@ -47,10 +47,10 @@ class ColaData:
         self.optimizer = optimizer
 
         train_data_obj = BertDataset(config.max_len, config.model_name, config.train_batch_size)
-        self.train_dataset = train_data_obj.create(self.x_train.values, self.y_train_enc)
+        train_dataset = train_data_obj.create(self.x_train.values, self.y_train_enc)
 
         valid_data_obj = BertDataset(config.max_len, config.model_name, config.eval_batch_size)
-        self.valid_dataset = valid_data_obj.create(self.x_val.values, self.y_val_enc)
+        valid_dataset = valid_data_obj.create(self.x_val.values, self.y_val_enc)
 
         self.model.compile(
             optimizer=self.optimizer,
@@ -58,13 +58,13 @@ class ColaData:
             metrics=["accuracy", tfa.metrics.MatthewsCorrelationCoefficient(num_classes=2)],
         )
 
-        self.model.fit(self.train_dataset, epochs=config.epochs, validation_data=self.valid_dataset)
+        self.model.fit(train_dataset, epochs=config.epochs, validation_data=valid_dataset)
         return self
 
     def create_submission(self):
         test_data_obj = BertDataset(self.config.max_len, self.config.model_name, self.config.eval_batch_size)
-        self.test_dataset = test_data_obj.create(self.testdf["Sentence"].values, [[0, 1]] * len(self.testdf))
-        preds = self.model.predict(self.test_dataset)
+        test_dataset = test_data_obj.create(self.testdf["Sentence"].values, [[0, 1]] * len(self.testdf))
+        preds = self.model.predict(test_dataset)
         self.testdf["Label"] = np.argmax(preds, axis=1)
         print(f"\n\nTest Data: \n{self.testdf['Label'].value_counts()}")
         self.testdf[["Id", "Label"]].to_csv("sample_submission.csv", index=False)
