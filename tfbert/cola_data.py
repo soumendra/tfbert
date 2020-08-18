@@ -16,7 +16,7 @@ class ColaData:
 
     @staticmethod
     def get_cola_xy(df: DataFrame) -> List[DataFrame]:
-        return [df["sentence"]), df["label"]]
+        return [df["sentence"], df["label"]]
 
     def get_cola_df(self):
         in_domain_train = pd.read_csv(self.path / "in_domain_train.tsv", sep="\t", names=self.cols)
