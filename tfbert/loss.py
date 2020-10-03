@@ -1,6 +1,6 @@
 from tensorflow.keras.losses import BinaryCrossentropy  # type: ignore
 
-binary_cross_entropy = BinaryCrossentropy(from_logits=True)
+binary_cross_entropy = BinaryCrossentropy()
 
 
 def bce(targets, logits):
